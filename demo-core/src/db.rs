@@ -41,7 +41,7 @@ struct DBInner<S: Storage + Clone> {
 }
 
 impl<S: Storage + Clone> DemoDB<S> {
-    pub fn open<P: AsRef<Path>>(path: P, storage: S, config_path: P) -> Result<Self> {
+    pub fn open(path: impl AsRef<Path>, storage: S, config_path: impl AsRef<Path>) -> Result<Self> {
         // TODO (recover)
 
         let config = Config::new(storage.open(config_path)?)?;

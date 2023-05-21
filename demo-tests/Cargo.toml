@@ -1,0 +1,15 @@
+[package]
+name = "demo-tests"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+demo-client = { path = "../demo-client" }
+demo-core = { path = "../demo-core" }
+demo-daemon = { path = "../demo-daemon" }
+
+[dev-dependencies]
+env_logger = "0.10"
+tokio = { version = "1", features = ["full"] }

@@ -1,0 +1,15 @@
+[package]
+name = "demo-daemon"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+demo-core = { path = "../demo-core" }
+tokio = { version = "1", features = ["full"] }
+warp = "0.3"
+clap = { version = "4", features = ["derive"] }
+bytes = "1"
+log = "0.4"
+env_logger = "0.10"

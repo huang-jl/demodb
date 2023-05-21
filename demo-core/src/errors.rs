@@ -13,8 +13,12 @@ pub enum Error {
     EOF,
     #[error("key order not matched")]
     KeyOrder,
-    #[error("Internal error: {0}")]
+    #[error("internal error: {0}")]
     Internal(String),
+    #[error("config error: {0}")]
+    Config(String),
+    #[error("client error: {0}")]
+    Client(String),
 }
 
 impl From<io::Error> for Error {

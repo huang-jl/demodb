@@ -1,11 +1,17 @@
 use crate::storage::{File, Storage};
 use crate::{Error, Result};
-use std::fs::{read_dir, remove_file, rename, create_dir_all, File as SysFile, OpenOptions};
+use std::fs::{create_dir_all, read_dir, remove_file, rename, File as SysFile, OpenOptions};
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 
 #[derive(Clone, Default)]
 pub struct FileStorage;
+
+impl FileStorage {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
 
 impl Storage for FileStorage {
     type F = SysFile;
