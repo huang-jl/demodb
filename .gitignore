@@ -1,4 +1,4 @@
 /target
-test*/
+test*-dir/
 case*-dir/
 Cargo.lock
