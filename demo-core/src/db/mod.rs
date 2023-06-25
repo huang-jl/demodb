@@ -8,12 +8,16 @@ use crate::storage::{File, FileType, Storage};
 use crate::table_cache::TableCache;
 use crate::version::{DBVersion, FileMetaData, Version};
 use crate::Result;
+use crate::txn::LockManager;
 use crate::{misc, Error};
 use log::{debug, error, info, warn};
 use std::collections::VecDeque;
 use std::path::Path;
+use std::sync::atomic::AtomicU64;
 use std::sync::mpsc::SyncSender;
 use std::sync::{mpsc, Arc, Condvar, Mutex, MutexGuard, RwLock};
+
+mod txn;
 
 #[derive(Clone)]
 pub struct DemoDB<S: Storage + Clone + 'static> {
@@ -23,7 +27,7 @@ pub struct DemoDB<S: Storage + Clone + 'static> {
     inner: Arc<DBInner<S>>,
 }
 
-struct DBInner<S: Storage + Clone> {
+pub(crate) struct DBInner<S: Storage + Clone> {
     // mem table
     mt: RwLock<Memtable>,
     // immutable mem table
@@ -38,6 +42,9 @@ struct DBInner<S: Storage + Clone> {
     write_queue: Mutex<VecDeque<BatchTask>>,
     /// signal background thread that new BatchTask is arriving
     write_signal: Condvar,
+
+    lock_manager: Mutex<LockManager>,
+    next_txn_id: AtomicU64,
 }
 
 impl<S: Storage + Clone> DemoDB<S> {
@@ -63,6 +70,8 @@ impl<S: Storage + Clone> DemoDB<S> {
             write_queue: Mutex::new(VecDeque::new()),
             write_signal: Condvar::new(),
             compact_signal: Condvar::new(),
+            lock_manager: Mutex::new(LockManager::new()),
+            next_txn_id: AtomicU64::new(0),
         };
 
         let this = Self {

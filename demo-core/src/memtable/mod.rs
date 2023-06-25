@@ -91,7 +91,7 @@ impl Memtable {
     }
 
     /// parsing a byte array according to data placement rules of `Memtable`
-    /// 
+    ///
     /// The `buf` should be results value read from [`crate::sstable::BlockItertor`]
     /// of SSTable (i.e. [`crate::sstable::Table`])
     pub fn parse_value(buf: &[u8]) -> Result<(ValType, &[u8])> {

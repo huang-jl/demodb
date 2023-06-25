@@ -50,6 +50,7 @@ impl ValType {
 // [Entry Num: 4B] [Entry1] [Entry2] ... [Entryn]
 
 // batch task containes multiple put / delete op
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct WriteBatch {
     data: Vec<u8>,
 }
@@ -103,6 +104,39 @@ impl WriteBatch {
 
     pub(crate) fn from_raw(data: Vec<u8>) -> Self {
         Self { data }
+    }
+
+    // Some(Some()) => find put in batch
+    // Some(None) => find del in batch
+    // None => do not find in batch
+    pub fn get_in_batch(&self, key: &[u8]) -> Result<Option<Option<&[u8]>>> {
+        // first get from write batch
+        let mut batch_iter = self.iter();
+        let mut res_in_batch: Option<(*const u8, usize)> = None;
+        loop {
+            match batch_iter.next()? {
+                Some((ValType::Put, k, v)) if k == key => {
+                    res_in_batch = Some((v.as_ptr(), v.len()));
+                }
+                Some((ValType::Del, k, _)) if k == key => {
+                    res_in_batch = Some((std::ptr::null(), 0));
+                }
+                Some(_) => {}
+                None => break,
+            }
+        }
+        match res_in_batch {
+            Some((p, _)) if p.is_null() => {
+                // we meet a delete at last
+                Ok(Some(None))
+            }
+            Some((p, l)) => {
+                // we meet a put at last
+                let value = unsafe { std::slice::from_raw_parts(p, l) };
+                Ok(Some(Some(value)))
+            }
+            _ => Ok(None),
+        }
     }
 }
 

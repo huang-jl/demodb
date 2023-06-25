@@ -46,7 +46,7 @@ fn case2() {
     assert_eq!(get(&db, "B"), Some(5));
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn case3() {
     use common::*;
     init();

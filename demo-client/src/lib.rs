@@ -6,6 +6,11 @@ pub struct Client {
     base_url: String,
 }
 
+// pub struct RemoteTxn {
+//     write_batch: WriteBatch,
+//     txn_id: u64,
+// }
+
 impl Client {
     /// Create a new DemoDB client
     /// - `base_url`: baseurl of DemoDB server
@@ -103,3 +108,25 @@ impl Client {
         }
     }
 }
+
+// impl Client {
+//     pub async fn begin_txn(&self) -> Result<RemoteTxn> {
+//         let target_url = format!("{}/begin-txn", self.base_url);
+//         let res = self
+//             .client
+//             .post(target_url)
+//             .send()
+//             .await
+//             .map_err(|e| Error::Client(e.to_string()))?
+//             .text()
+//             .await
+//             .map_err(|e| Error::Client(e.to_string()))?;
+//         let txn_id = res
+//             .parse::<u64>()
+//             .map_err(|e| Error::Client(format!("parse txn id failed {:?}", e)))?;
+//         Ok(RemoteTxn {
+//             txn_id,
+//             write_batch: WriteBatch::new(),
+//         })
+//     }
+// }

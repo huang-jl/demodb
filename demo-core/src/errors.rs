@@ -19,6 +19,9 @@ pub enum Error {
     Config(String),
     #[error("client error: {0}")]
     Client(String),
+
+    #[error("Txn has conflict: {0}")]
+    TxnConflict(String)
 }
 
 impl From<io::Error> for Error {
