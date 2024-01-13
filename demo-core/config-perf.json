@@ -1,0 +1,4 @@
+{
+    "block_size": 4096,
+    "memtable_size": 1048576
+}

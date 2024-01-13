@@ -1,4 +1,4 @@
-use log::error;
+use log::{debug, error};
 
 use crate::batch::{ValType, WriteBatch};
 use crate::iterator::Iterator;

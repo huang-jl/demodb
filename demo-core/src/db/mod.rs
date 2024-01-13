@@ -6,9 +6,9 @@ use crate::record::{Reader, Writer};
 use crate::sstable::TableBuilder;
 use crate::storage::{File, FileType, Storage};
 use crate::table_cache::TableCache;
+use crate::txn::LockManager;
 use crate::version::{DBVersion, FileMetaData, Version};
 use crate::Result;
-use crate::txn::LockManager;
 use crate::{misc, Error};
 use log::{debug, error, info, warn};
 use std::collections::VecDeque;
@@ -419,30 +419,39 @@ impl<S: Storage + Clone> DemoDB<S> {
     /// This get raw value from KV Store:
     /// need parse `ValueType` before return to client
     fn get_raw_value_from_sst(&self, key: &[u8]) -> Option<Vec<u8>> {
-        let version = self.inner.version.lock().unwrap();
+        // we should not hold `version` lock for too long.
+        // So we just get the snapshot of sstable files at the time
+        // that we acquire the lock of `version` into `files`.
+        let files = {
+            let version = self.inner.version.lock().unwrap();
+            version.files[0]
+                .iter()
+                .rev()
+                .filter(|sst_meta| key <= &sst_meta.largest_key && key >= &sst_meta.smallest_key)
+                .map(|x| x.clone())
+                .collect::<Vec<_>>()
+        };
         let table_cache = &self.inner.table_cache;
 
         // For now, we only have level 0
         // and we need iterate throught reverse order
-        for sst_meta in version.files[0].iter().rev() {
-            if key <= &sst_meta.largest_key && key >= &sst_meta.smallest_key {
-                match table_cache.seek_key_in_table(sst_meta.file_num, key) {
-                    Ok(Some(iter)) => {
-                        assert!(iter.valid());
-                        if iter.key() == key {
-                            return Some(iter.value().to_vec());
-                        }
+        for sst_meta in files {
+            match table_cache.seek_key_in_table(sst_meta.file_num, key) {
+                Ok(Some(iter)) => {
+                    assert!(iter.valid());
+                    if iter.key() == key {
+                        return Some(iter.value().to_vec());
                     }
-                    Ok(None) => {
-                        warn!("Weird: cannot seek in table whose FileMeta is matching");
-                    }
-                    Err(e) => {
-                        error!(
-                            "error occur when seek in sst table {} {e}",
-                            sst_meta.file_num
-                        );
-                        return None;
-                    }
+                }
+                Ok(None) => {
+                    warn!("Weird: cannot seek in table whose FileMeta is matching");
+                }
+                Err(e) => {
+                    error!(
+                        "error occur when seek in sst table {} {e}",
+                        sst_meta.file_num
+                    );
+                    return None;
                 }
             }
         }

@@ -59,7 +59,7 @@ impl Version {
 }
 
 /// The metadata of sst table
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Default, Clone, Serialize, Deserialize)]
 pub(crate) struct FileMetaData {
     pub(crate) file_num: u64,
     pub(crate) file_size: u64,

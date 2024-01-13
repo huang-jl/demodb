@@ -5,3 +5,6 @@ members = [
     "demo-client",
     "demo-tests",
 ]
+
+[profile.test]
+opt-level = 3

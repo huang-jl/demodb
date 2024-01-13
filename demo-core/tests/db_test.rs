@@ -1,9 +1,11 @@
 use demo_core::{DemoDB, FileStorage, Txn, WriteBatch};
+use log::info;
 use rand::{
     prelude::{SliceRandom, StdRng},
-    SeedableRng,
+    random, thread_rng, Rng, SeedableRng,
 };
 use std::{
+    fmt::format,
     sync::{
         atomic::{AtomicU64, Ordering},
         Arc,
@@ -372,4 +374,133 @@ fn case5() {
 
     assert_eq!(a, success * 3 - 1);
     assert_eq!(b, a + 1);
+}
+
+#[test]
+fn read_only_test() {
+    const THREAD_NUM: u32 = 16;
+    const REQUEST_PER_THREAD: u32 = 50000;
+    common::init();
+    common::remove("./perf-test-dir");
+
+    let storage = FileStorage;
+    let db = DemoDB::open("./perf-test-dir", storage, "./config-perf.json").unwrap();
+    let mut rng = StdRng::seed_from_u64(0xdaedbeef);
+
+    let mut all_key = (0..10000_u32).collect::<Vec<_>>();
+    all_key.shuffle(&mut rng);
+
+    // 1. first write some kv
+    // we use chunk, so that it will trigger writing sst
+    for chunk in all_key.chunks(100) {
+        let mut batch = WriteBatch::new();
+        for i in chunk {
+            let key = i.to_le_bytes();
+            let value = format!("{i}").repeat(128);
+            batch.put(&key, value.as_bytes());
+        }
+        db.write_batch(batch).unwrap();
+    }
+
+    // start test read
+    let start = Instant::now();
+    let mut handles = vec![];
+    for _ in 0..THREAD_NUM {
+        let db = db.clone();
+        let t = std::thread::spawn(move || {
+            for i in 0..REQUEST_PER_THREAD {
+                let key = random::<u32>() % 20000;
+                if key < 10000 {
+                    assert!(db.get(&key.to_le_bytes()).is_some());
+                } else {
+                    assert!(db.get(&key.to_le_bytes()).is_none());
+                }
+            }
+        });
+        handles.push(t);
+    }
+    for t in handles {
+        t.join().unwrap();
+    }
+    let elapsed = start.elapsed();
+
+    println!(
+        "thread num: {}, read only, tput: {} qps",
+        THREAD_NUM,
+        (REQUEST_PER_THREAD as f64) * (THREAD_NUM as f64) / elapsed.as_secs_f64()
+    )
+}
+
+#[test]
+fn read_write_test() {
+    const THREAD_NUM: u32 = 2;
+    const REQUEST_PER_THREAD: u32 = 10000;
+    const READ_RATIO: f64 = 0.8;
+    common::init();
+    common::remove("./perf-test-dir");
+
+    let storage = FileStorage;
+    let db = DemoDB::open("./perf-test-dir", storage, "./config-perf.json").unwrap();
+    let mut rng = StdRng::seed_from_u64(0xdaedbeef);
+
+    let mut all_key = (0..10000_u32).collect::<Vec<_>>();
+    all_key.shuffle(&mut rng);
+
+    // 1. first write some kv
+    // we use chunk, so that it will trigger writing sst
+    for chunk in all_key.chunks(100) {
+        let mut batch = WriteBatch::new();
+        for i in chunk {
+            let key = i.to_le_bytes();
+            let value = format!("{i}").repeat(128);
+            batch.put(&key, value.as_bytes());
+        }
+        db.write_batch(batch).unwrap();
+    }
+
+    let values = (0..100)
+        .map(|i| format!("{i}").repeat(128))
+        .collect::<Vec<_>>();
+    let values = Arc::new(values);
+
+    // start test read
+    let start = Instant::now();
+    let mut handles = vec![];
+    for _ in 0..THREAD_NUM {
+        let db = db.clone();
+        let values = values.clone();
+        let t = std::thread::spawn(move || {
+            let mut rng = thread_rng();
+            for i in 0..REQUEST_PER_THREAD {
+                if rng.gen::<f64>() < READ_RATIO {
+                    // read
+                    let key = rng.gen::<u32>() % 20000;
+                    if key < 10000 {
+                        assert!(db.get(&key.to_le_bytes()).is_some());
+                    } else {
+                        assert!(db.get(&key.to_le_bytes()).is_none());
+                    }
+                } else {
+                    // write
+                    let key = rng.gen::<u32>() % 10000;
+                    let mut batch = WriteBatch::new();
+                    let value = values.choose(&mut rng).unwrap();
+                    batch.put(&key.to_le_bytes(), value.as_bytes());
+                    db.write_batch(batch).unwrap();
+                }
+            }
+        });
+        handles.push(t);
+    }
+    for t in handles {
+        t.join().unwrap();
+    }
+    let elapsed = start.elapsed();
+
+    println!(
+        "thread num: {}, read ratio: {}, tput: {} qps",
+        THREAD_NUM,
+        READ_RATIO,
+        (REQUEST_PER_THREAD as f64) * (THREAD_NUM as f64) / elapsed.as_secs_f64()
+    )
 }
